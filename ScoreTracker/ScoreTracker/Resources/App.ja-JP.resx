@@ -1392,6 +1392,9 @@
     <value>PUMBILITY最大上昇</value>
   </data>
   <data name="Bind Selected Chart" xml:space="preserve">
+      <data name="BIN files are discarded for now." xml:space="preserve">
+        <value>BINファイルは現時点では破棄されます。インポート機能はまだ実装されていません。</value>
+      </data>
     <value>選択したチャートをバインド</value>
   </data>
   <data name="Block" xml:space="preserve">

@@ -1385,6 +1385,9 @@
     <value>Mayor subida de PUMBILITY</value>
   </data>
   <data name="Bind Selected Chart" xml:space="preserve">
+      <data name="BIN files are discarded for now." xml:space="preserve">
+        <value>Los archivos BIN se descartan por ahora; la importación aún no está implementada.</value>
+      </data>
     <value>Vincular chart seleccionado</value>
   </data>
   <data name="Block" xml:space="preserve">

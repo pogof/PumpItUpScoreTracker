@@ -15,6 +15,7 @@
 @using ScoreTracker.Web.Dtos
 @using ScoreTracker.Web.Services
 @using ScoreTracker.Web.Services.Contracts
+@using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>@L["Upload XX Scores"]</PageTitle>
 
@@ -24,6 +25,8 @@
         @switch (_currentStep)
         {
             case Step.Information:
+                @if (!_useBinImport)
+                {
                 <p>
                     @L["Some players already maintain scores via Spreadsheets."]
                     <br/><br/>
@@ -31,6 +34,7 @@
                     <br/><br/>
                     @L["After the upload, if there are some rows/charts/attempts that did not upload correctly, you will be given the option to download a list of the failed rows and the reason they failed."]
                 </p>
+                }
                 @* One CSV format, every legacy mix: scores land against the selected mix's
                    catalog at that mix's own levels (docs/design/legacy-mixes.md). *@
                 <MudSelect T="MixEnum" Label="@L["Mix"]" @bind-Value="_targetMix" Style="max-width: 220px;">
@@ -39,17 +43,52 @@
                         <MudSelectItem Value="@mix">@mix.GetName()</MudSelectItem>
                     }
                 </MudSelect>
-                @* Off by default, because the destructive reading of an upload is the surprising
-                   one: a partial or older sheet would otherwise lower grades, flip passes to
-                   breaks, and wipe era scores typed by hand. On, the file is the authority --
-                   which is how you fix a mistake you already uploaded. *@
-                <MudSwitch T="bool" @bind-Value="_overwriteExisting" Color="Color.Primary"
-                           Label="@L["Let this file replace my records"]"></MudSwitch>
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">
-                    @(_overwriteExisting
-                        ? L["Every row in the file wins, even where it is worse than what you have."]
-                        : L["Only improvements are kept. Score and grade rise separately."])
-                </MudText>
+                @if (SupportsBinImport)
+                {
+                    <MudToggleGroup T="bool" Value="_useBinImport" ValueChanged="SetBinImport"
+                                    SelectionMode="SelectionMode.SingleSelection" Color="Color.Primary" Class="mt-2">
+                        <MudToggleItem Value="false" Text="CSV / XLSX"></MudToggleItem>
+                        <MudToggleItem Value="true" Text="BIN"></MudToggleItem>
+                    </MudToggleGroup>
+                }
+                @if (_useBinImport && ExpectedBinFileNames is { } expectedFiles)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@L["BIN files are discarded for now."]</MudAlert>
+                    <div class="d-flex flex-wrap align-center gap-2 mt-2">
+                        <MudButton HtmlTag="label" for="rankBinInput" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile">
+                            @expectedFiles.Rank
+                        </MudButton>
+                        @if (_rankBinFile is not null)
+                        {
+                            <MudText Typo="Typo.caption">@_rankBinFile.Name</MudText>
+                        }
+                        <MudButton HtmlTag="label" for="saveBinInput" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile">
+                            @expectedFiles.Save
+                        </MudButton>
+                        @if (_saveBinFile is not null)
+                        {
+                            <MudText Typo="Typo.caption">@_saveBinFile.Name</MudText>
+                        }
+                    </div>
+                    @if (_isDiscardingBinFiles)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2"></MudProgressLinear>
+                    }
+                }
+                @if (!_useBinImport)
+                {
+                    @* Off by default, because the destructive reading of an upload is the surprising
+                       one: a partial or older sheet would otherwise lower grades, flip passes to
+                       breaks, and wipe era scores typed by hand. On, the file is the authority --
+                       which is how you fix a mistake you already uploaded. *@
+                    <MudSwitch T="bool" @bind-Value="_overwriteExisting" Color="Color.Primary"
+                               Label="@L["Let this file replace my records"]"></MudSwitch>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @(_overwriteExisting
+                            ? L["Every row in the file wins, even where it is worse than what you have."]
+                            : L["Only improvements are kept. Score and grade rise separately."])
+                    </MudText>
+                }
                 break;
             case Step.Uploading:
                 <p>
@@ -126,18 +165,32 @@
         }
         @if (_currentStep == Step.Information)
         {
-            <MudButton Variant="@Variant.Text"
-                       Color="@Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Info"
-                       OnClick="()=>_isExampleDialogShowing=true">@L["Supported Formats"]</MudButton>
-
-            <MudButton HtmlTag="label"
-                       Variant="@Variant.Filled"
-                       Color="@Color.Primary"
-                       StartIcon="@Icons.Material.Filled.UploadFile"
-                       for="uploadInput">
-                @L["Upload Scores"]
-            </MudButton>
+            @if (!_useBinImport)
+            {
+                <MudButton Variant="@Variant.Text"
+                           Color="@Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Info"
+                           OnClick="()=>_isExampleDialogShowing=true">@L["Supported Formats"]</MudButton>
+            }
+            @if (_useBinImport)
+            {
+                <MudButton Variant="@Variant.Filled" Color="@Color.Primary"
+                           StartIcon="@Icons.Material.Filled.UploadFile"
+                           Disabled="@(!CanUploadBinFiles || _isDiscardingBinFiles)"
+                           OnClick="UploadBinFiles">
+                    @L["Upload Scores"]
+                </MudButton>
+            }
+            else
+            {
+                <MudButton HtmlTag="label"
+                           Variant="@Variant.Filled"
+                           Color="@Color.Primary"
+                           StartIcon="@Icons.Material.Filled.UploadFile"
+                           for="uploadInput">
+                    @L["Upload Scores"]
+                </MudButton>
+            }
         }
         @if (_currentStep == Step.Confirming)
         {
@@ -167,6 +220,8 @@
     </MudCardActions>
 </MudCard>
 <InputFile id="uploadInput" OnChange="@UploadFile" hidden accept=".csv,.xlsx"/>
+<InputFile @key="RankBinInputKey" id="rankBinInput" OnChange="SelectRankBinFile" hidden accept=".bin" />
+<InputFile @key="SaveBinInputKey" id="saveBinInput" OnChange="SelectSaveBinFile" hidden accept=".bin" />
 
 <MudDialog @bind-Visible="_isExampleDialogShowing">
     <TitleContent>
@@ -264,7 +319,32 @@
         .OrderByDescending(m => m.DisplayOrder())
         .ToArray();
 
+    private const long MaxBinFileBytes = 10 * 1024 * 1024;
+    private static readonly IReadOnlyDictionary<MixEnum, (string Rank, string Save)> BinFileNames =
+        new Dictionary<MixEnum, (string Rank, string Save)>
+        {
+            [MixEnum.Nx2] = ("nx2rank.bin", "nx2save.bin"),
+            [MixEnum.NxAbsolute] = ("nxarank.bin", "nxasave.bin"),
+            [MixEnum.Fiesta] = ("fiesta_rank.bin", "fiesta_save.bin"),
+            [MixEnum.FiestaEx] = ("fiestaex_rank.bin", "fiestaex_save.bin"),
+            [MixEnum.Fiesta2] = ("fiesta2_rank.bin", "fiesta2_save.bin")
+        };
+
     private MixEnum _targetMix = MixEnum.XX;
+    private bool _useBinImport;
+    private bool _isDiscardingBinFiles;
+    private IBrowserFile? _rankBinFile;
+    private IBrowserFile? _saveBinFile;
+    private int _rankBinInputKey;
+    private int _saveBinInputKey;
+    private string RankBinInputKey => $"rank-{_rankBinInputKey}";
+    private string SaveBinInputKey => $"save-{_saveBinInputKey}";
+    private (string Rank, string Save)? ExpectedBinFileNames =>
+        BinFileNames.TryGetValue(_targetMix, out var names) ? names : null;
+    private bool SupportsBinImport => ExpectedBinFileNames.HasValue;
+    private bool CanUploadBinFiles => ExpectedBinFileNames is { } expected
+        && _rankBinFile?.Name.Equals(expected.Rank, StringComparison.OrdinalIgnoreCase) == true
+        && _saveBinFile?.Name.Equals(expected.Save, StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>
     ///     False runs LegacyBestAttemptPolicy: an upload may only raise a record, and raises the
@@ -272,6 +352,64 @@
     ///     something downward — and was the unannounced behaviour of every upload before this.
     /// </summary>
     private bool _overwriteExisting;
+
+    private void OnTargetMixChanged(MixEnum mix)
+    {
+        _targetMix = mix;
+        _useBinImport = false;
+        _rankBinFile = null;
+        _saveBinFile = null;
+        _rankBinInputKey++;
+        _saveBinInputKey++;
+    }
+
+    private void SetBinImport(bool useBinImport)
+    {
+        _useBinImport = useBinImport;
+        _rankBinFile = null;
+        _saveBinFile = null;
+        _rankBinInputKey++;
+        _saveBinInputKey++;
+    }
+
+    private void SelectRankBinFile(InputFileChangeEventArgs e) => _rankBinFile = e.File;
+
+    private void SelectSaveBinFile(InputFileChangeEventArgs e) => _saveBinFile = e.File;
+
+    private async Task UploadBinFiles()
+    {
+        if (!CanUploadBinFiles || _rankBinFile is null || _saveBinFile is null)
+            return;
+
+        if (_rankBinFile.Size > MaxBinFileBytes || _saveBinFile.Size > MaxBinFileBytes)
+        {
+            Snackbar.Add(L["File cannot be larger than 10 MB"].Value, Severity.Error);
+            return;
+        }
+
+        _isDiscardingBinFiles = true;
+        try
+        {
+            await using (var rankStream = _rankBinFile.OpenReadStream(MaxBinFileBytes))
+                await rankStream.CopyToAsync(Stream.Null);
+            await using (var saveStream = _saveBinFile.OpenReadStream(MaxBinFileBytes))
+                await saveStream.CopyToAsync(Stream.Null);
+
+            Snackbar.Add(L["BIN files are discarded for now."].Value, Severity.Info);
+            _rankBinFile = null;
+            _saveBinFile = null;
+            _rankBinInputKey++;
+            _saveBinInputKey++;
+        }
+        catch (Exception)
+        {
+            Snackbar.Add(L["An unknown error occurred"].Value, Severity.Error);
+        }
+        finally
+        {
+            _isDiscardingBinFiles = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

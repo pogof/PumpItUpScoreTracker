@@ -1385,6 +1385,9 @@
     <value>PUMBILITY 최다 상승</value>
   </data>
   <data name="Bind Selected Chart" xml:space="preserve">
+      <data name="BIN files are discarded for now." xml:space="preserve">
+        <value>BIN 파일은 현재 폐기됩니다. 가져오기 기능은 아직 구현되지 않았습니다.</value>
+      </data>
     <value>선택한 채보 연결</value>
   </data>
   <data name="Block" xml:space="preserve">

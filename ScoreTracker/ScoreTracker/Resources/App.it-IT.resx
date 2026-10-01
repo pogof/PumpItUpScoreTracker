@@ -1392,6 +1392,9 @@
     <value>Maggior guadagno di PUMBILITY</value>
   </data>
   <data name="Bind Selected Chart" xml:space="preserve">
+      <data name="BIN files are discarded for now." xml:space="preserve">
+        <value>I file BIN vengono scartati per ora; l'importazione non è ancora implementata.</value>
+      </data>
     <value>Collega il chart selezionato</value>
   </data>
   <data name="Block" xml:space="preserve">

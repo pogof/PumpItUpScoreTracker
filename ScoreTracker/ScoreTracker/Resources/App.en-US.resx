@@ -1392,6 +1392,9 @@
     <value>Biggest PUMBILITY gainer</value>
   </data>
   <data name="Bind Selected Chart" xml:space="preserve">
+      <data name="BIN files are discarded for now." xml:space="preserve">
+        <value>BIN files are discarded for now.</value>
+      </data>
     <value>Bind Selected Chart</value>
   </data>
   <data name="Block" xml:space="preserve">
